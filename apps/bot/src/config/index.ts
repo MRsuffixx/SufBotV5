@@ -40,8 +40,8 @@ const configSchema = z.object({
   }),
   
   sharding: z.object({
-    shardCount: z.string().default('auto'),
-    shardsPerCluster: z.coerce.number().default(2),
+    shardCount: z.string().optional().default('1'),
+    shardsPerCluster: z.coerce.number().optional().default(1),
   }),
   
   logging: z.object({

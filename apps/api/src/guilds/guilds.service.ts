@@ -115,7 +115,21 @@ export class GuildsService {
       }
     }
 
-    return guild;
+    // Convert boolean fields to enabledModules array for the panel
+    const enabledModules: string[] = [];
+    if (guild.settings?.moderationEnabled) enabledModules.push('moderation');
+    if (guild.settings?.economyEnabled) enabledModules.push('economy');
+    if (guild.settings?.welcomeEnabled) enabledModules.push('welcome');
+    if (guild.settings?.loggingEnabled) enabledModules.push('logging');
+    if (guild.settings?.autoModEnabled) enabledModules.push('automod');
+
+    return {
+      ...guild,
+      settings: guild.settings ? {
+        ...guild.settings,
+        enabledModules,
+      } : { enabledModules: ['moderation'] },
+    };
   }
 
   async updateGuildSettings(guildId: string, data: any) {
@@ -127,12 +141,24 @@ export class GuildsService {
       throw new NotFoundException('Guild not found');
     }
 
+    // Convert enabledModules array to individual boolean fields
+    const { enabledModules, ...rest } = data;
+    const settingsData: any = { ...rest };
+    
+    if (enabledModules && Array.isArray(enabledModules)) {
+      settingsData.moderationEnabled = enabledModules.includes('moderation');
+      settingsData.economyEnabled = enabledModules.includes('economy');
+      settingsData.welcomeEnabled = enabledModules.includes('welcome');
+      settingsData.loggingEnabled = enabledModules.includes('logging');
+      settingsData.autoModEnabled = enabledModules.includes('automod');
+    }
+
     return this.prisma.guildSettings.upsert({
       where: { guildId },
-      update: data,
+      update: settingsData,
       create: {
         guildId,
-        ...data,
+        ...settingsData,
       },
     });
   }
@@ -240,5 +266,94 @@ export class GuildsService {
         ...data,
       },
     });
+  }
+
+  async getGuildChannels(guildId: string) {
+    // Fetch channels from Discord API using bot token
+    const botToken = process.env.DISCORD_TOKEN;
+    console.log('Fetching channels for guild:', guildId);
+    console.log('Bot token exists:', !!botToken);
+    
+    if (!botToken) {
+      console.error('DISCORD_TOKEN not found in environment');
+      return [];
+    }
+
+    try {
+      const url = `${DISCORD_API}/guilds/${guildId}/channels`;
+      console.log('Fetching from:', url);
+      
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bot ${botToken}`,
+        },
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to fetch channels:', response.status, errorText);
+        return [];
+      }
+
+      const channels = await response.json();
+      console.log('Fetched', channels.length, 'channels');
+      
+      return channels.map((channel: any) => ({
+        id: channel.id,
+        name: channel.name,
+        type: channel.type,
+        position: channel.position,
+      })).sort((a: any, b: any) => a.position - b.position);
+    } catch (error) {
+      console.error('Error fetching channels:', error);
+      return [];
+    }
+  }
+
+  async getGuildRoles(guildId: string) {
+    // Fetch roles from Discord API using bot token
+    const botToken = process.env.DISCORD_TOKEN;
+    console.log('Fetching roles for guild:', guildId);
+    console.log('Bot token exists:', !!botToken);
+    
+    if (!botToken) {
+      console.error('DISCORD_TOKEN not found in environment');
+      return [];
+    }
+
+    try {
+      const url = `${DISCORD_API}/guilds/${guildId}/roles`;
+      console.log('Fetching from:', url);
+      
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bot ${botToken}`,
+        },
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to fetch roles:', response.status, errorText);
+        return [];
+      }
+
+      const roles = await response.json();
+      console.log('Fetched', roles.length, 'roles');
+      
+      return roles.map((role: any) => ({
+        id: role.id,
+        name: role.name,
+        color: role.color,
+        position: role.position,
+        permissions: role.permissions,
+      })).sort((a: any, b: any) => b.position - a.position);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      return [];
+    }
   }
 }

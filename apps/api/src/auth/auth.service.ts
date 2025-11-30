@@ -64,12 +64,25 @@ export class AuthService {
   }
 
   async storeDiscordToken(userId: string, token: string) {
-    // Store in a simple way - in production use encrypted storage
-    await this.prisma.session.updateMany({
-      where: { userId },
-      data: { 
-        // Store token in userAgent field temporarily (should add proper field)
-        userAgent: `discord_token:${token}`,
+    // Create a special session to store the Discord token
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    
+    // Delete old discord token sessions
+    await this.prisma.session.deleteMany({
+      where: { 
+        userId,
+        ipAddress: 'discord_token',
+      },
+    });
+    
+    // Create new session with Discord token
+    await this.prisma.session.create({
+      data: {
+        userId,
+        ipAddress: 'discord_token',
+        userAgent: token,
+        expiresAt,
       },
     });
   }
@@ -78,15 +91,12 @@ export class AuthService {
     const session = await this.prisma.session.findFirst({
       where: { 
         userId,
-        userAgent: { startsWith: 'discord_token:' },
+        ipAddress: 'discord_token',
       },
       orderBy: { createdAt: 'desc' },
     });
     
-    if (session?.userAgent?.startsWith('discord_token:')) {
-      return session.userAgent.replace('discord_token:', '');
-    }
-    return null;
+    return session?.userAgent || null;
   }
 
   async generateTokens(userId: string, discordId: string, role: UserRole) {

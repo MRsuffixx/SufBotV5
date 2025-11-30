@@ -149,26 +149,31 @@ model WelcomeConfig {
   guildId         String   @unique
   guild           Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
   
-  enabled         Boolean  @default(false)
-  channelId       String?
-  message         String?  @default("Welcome {user} to {server}!")
-  embedEnabled    Boolean  @default(false)
-  embedColor      String?  @default("#5865F2")
-  embedTitle      String?
-  embedDescription String?
-  embedImage      String?
-  embedThumbnail  Boolean  @default(true)
+  // Welcome Channel Message
+  welcomeEnabled      Boolean  @default(false)
+  welcomeChannelId    String?
+  welcomeMessageType  String   @default("embed") // 'text' or 'embed'
+  welcomeMessage      String?  @default("Welcome {user} to {server}!")
+  welcomeEmbed        Json?    // Full embed configuration
   
-  // Leave message
-  leaveEnabled    Boolean  @default(false)
-  leaveChannelId  String?
-  leaveMessage    String?  @default("Goodbye {user}!")
+  // DM Message
+  dmEnabled           Boolean  @default(false)
+  dmMessageType       String   @default("text") // 'text' or 'embed'
+  dmMessage           String?  @default("Welcome to {server}!")
+  dmEmbed             Json?    // Full embed configuration
   
-  // DM welcome
-  dmEnabled       Boolean  @default(false)
-  dmMessage       String?
+  // Auto Roles
+  autoRolesEnabled    Boolean  @default(false)
+  autoRoles           String[] @default([])
   
-  updatedAt       DateTime @updatedAt
+  // Leave Message
+  leaveEnabled        Boolean  @default(false)
+  leaveChannelId      String?
+  leaveMessageType    String   @default("embed") // 'text' or 'embed'
+  leaveMessage        String?  @default("Goodbye {user.tag}!")
+  leaveEmbed          Json?    // Full embed configuration
+  
+  updatedAt           DateTime @updatedAt
 }
 
 // ============================================

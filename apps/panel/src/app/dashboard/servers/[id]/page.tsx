@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
+import WelcomeSettings from '@/components/welcome/WelcomeSettings';
 import { 
   Bot,
   Settings,
@@ -14,7 +15,8 @@ import {
   Filter,
   ArrowLeft,
   Save,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -26,12 +28,47 @@ interface GuildSettings {
   enabledModules: string[];
 }
 
+interface Channel {
+  id: string;
+  name: string;
+  type: number;
+}
+
+interface Role {
+  id: string;
+  name: string;
+  color: number;
+  position: number;
+}
+
+interface WelcomeConfig {
+  welcomeEnabled: boolean;
+  welcomeChannelId: string;
+  welcomeMessageType: 'text' | 'embed';
+  welcomeMessage: string;
+  welcomeEmbed: any;
+  dmEnabled: boolean;
+  dmMessageType: 'text' | 'embed';
+  dmMessage: string;
+  dmEmbed: any;
+  autoRolesEnabled: boolean;
+  autoRoles: string[];
+  leaveEnabled: boolean;
+  leaveChannelId: string;
+  leaveMessageType: 'text' | 'embed';
+  leaveMessage: string;
+  leaveEmbed: any;
+}
+
 interface Guild {
   id: string;
   name: string;
   icon: string | null;
   memberCount: number;
   settings: GuildSettings;
+  welcomeConfig?: WelcomeConfig;
+  channels?: Channel[];
+  roles?: Role[];
 }
 
 const MODULES = [
@@ -59,6 +96,13 @@ export default function ServerManagePage() {
   const [prefix, setPrefix] = useState('!');
   const [language, setLanguage] = useState('en');
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
+  
+  // Channels and Roles
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  
+  // Welcome config state
+  const [welcomeConfig, setWelcomeConfig] = useState<WelcomeConfig | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -74,6 +118,7 @@ export default function ServerManagePage() {
 
   const fetchGuild = async () => {
     try {
+      // Fetch guild data
       const response = await fetch(`${API_URL}/api/guilds/${guildId}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -83,8 +128,40 @@ export default function ServerManagePage() {
         setPrefix(data.settings?.prefix || '!');
         setLanguage(data.settings?.language || 'en');
         setEnabledModules(data.settings?.enabledModules || ['moderation']);
+        if (data.welcomeConfig) {
+          setWelcomeConfig(data.welcomeConfig);
+        }
       } else if (response.status === 404) {
         router.push('/dashboard/servers');
+        return;
+      }
+
+      // Fetch channels
+      console.log('Fetching channels from:', `${API_URL}/api/guilds/${guildId}/channels`);
+      const channelsRes = await fetch(`${API_URL}/api/guilds/${guildId}/channels`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      console.log('Channels response status:', channelsRes.status);
+      if (channelsRes.ok) {
+        const channelsData = await channelsRes.json();
+        console.log('Channels data:', channelsData);
+        setChannels(channelsData);
+      } else {
+        console.error('Failed to fetch channels:', await channelsRes.text());
+      }
+
+      // Fetch roles
+      console.log('Fetching roles from:', `${API_URL}/api/guilds/${guildId}/roles`);
+      const rolesRes = await fetch(`${API_URL}/api/guilds/${guildId}/roles`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      console.log('Roles response status:', rolesRes.status);
+      if (rolesRes.ok) {
+        const rolesData = await rolesRes.json();
+        console.log('Roles data:', rolesData);
+        setRoles(rolesData);
+      } else {
+        console.error('Failed to fetch roles:', await rolesRes.text());
       }
     } catch (error) {
       console.error('Failed to fetch guild:', error);
@@ -96,7 +173,8 @@ export default function ServerManagePage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`${API_URL}/api/guilds/${guildId}/settings`, {
+      // Save general settings
+      const settingsRes = await fetch(`${API_URL}/api/guilds/${guildId}/settings`, {
         method: 'PUT',
         headers: { 
           Authorization: `Bearer ${accessToken}`,
@@ -108,7 +186,20 @@ export default function ServerManagePage() {
           enabledModules,
         }),
       });
-      if (response.ok) {
+
+      // Save welcome config if on welcome tab
+      if (welcomeConfig) {
+        await fetch(`${API_URL}/api/guilds/${guildId}/welcome`, {
+          method: 'PUT',
+          headers: { 
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(welcomeConfig),
+        });
+      }
+
+      if (settingsRes.ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
@@ -117,6 +208,10 @@ export default function ServerManagePage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleWelcomeConfigChange = (newConfig: WelcomeConfig) => {
+    setWelcomeConfig(newConfig);
   };
 
   const toggleModule = (moduleId: string) => {
@@ -353,17 +448,24 @@ export default function ServerManagePage() {
             )}
 
             {activeTab === 'welcome' && (
-              <div className="rounded-xl border bg-card p-6">
-                <h2 className="text-xl font-semibold mb-4">Welcome Messages</h2>
-                <p className="text-muted-foreground">
-                  Configure welcome and goodbye messages for new members.
-                </p>
-                <div className="mt-6 p-8 border border-dashed rounded-lg text-center">
-                  <Bell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    Welcome settings coming soon...
-                  </p>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">Welcome & Leave System</h2>
+                    <p className="text-muted-foreground">
+                      Configure welcome messages, DM messages, auto roles, and leave messages.
+                    </p>
+                  </div>
                 </div>
+                
+                <WelcomeSettings
+                  guildId={guildId}
+                  accessToken={accessToken || ''}
+                  onSave={handleWelcomeConfigChange}
+                  initialConfig={welcomeConfig || undefined}
+                  channels={channels}
+                  roles={roles}
+                />
               </div>
             )}
 

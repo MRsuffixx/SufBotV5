@@ -122,4 +122,22 @@ export class GuildsController {
   ) {
     return this.guildsService.updateFilter(guildId, filterType, data);
   }
+
+  @Get(':id/channels')
+  @ApiOperation({ summary: 'Get guild channels from Discord' })
+  async getChannels(
+    @Param('id') guildId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.guildsService.getGuildChannels(guildId);
+  }
+
+  @Get(':id/roles')
+  @ApiOperation({ summary: 'Get guild roles from Discord' })
+  async getRoles(
+    @Param('id') guildId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.guildsService.getGuildRoles(guildId);
+  }
 }

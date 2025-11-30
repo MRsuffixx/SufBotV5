@@ -34,6 +34,19 @@ export class AuthController {
   @ApiOperation({ summary: 'Discord OAuth2 callback' })
   async discordCallback(@Req() req: Request, @Res() res: Response) {
     const user = req.user as any;
+    
+    // Create session first (needed for storing Discord token)
+    await this.authService.createSession(
+      user.id,
+      req.ip,
+      req.headers['user-agent'] as string,
+    );
+
+    // Store Discord access token if available
+    if (user.discordAccessToken) {
+      await this.authService.storeDiscordToken(user.id, user.discordAccessToken);
+    }
+
     const tokens = await this.authService.generateTokens(
       user.id,
       user.discordId,
@@ -48,13 +61,6 @@ export class AuthController {
       user.id,
       { method: 'discord_oauth' },
       req.ip,
-    );
-
-    // Create session
-    await this.authService.createSession(
-      user.id,
-      req.ip,
-      req.headers['user-agent'],
     );
 
     // Set refresh token as HTTP-only cookie
