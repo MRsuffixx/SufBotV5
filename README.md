@@ -1,3 +1,5 @@
+# This bot is not finished yet. Please do not use it.
+
 # SufBot V5 - Advanced Discord Bot Infrastructure
 
 A production-ready Discord bot infrastructure built with a monorepo architecture featuring:
