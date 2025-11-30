@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
-import Image from 'next/image';
 import { 
   Bot,
   Settings,
@@ -17,6 +16,8 @@ import {
   Save,
   Check
 } from 'lucide-react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface GuildSettings {
   prefix: string;
@@ -73,7 +74,7 @@ export default function ServerManagePage() {
 
   const fetchGuild = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/guilds/${guildId}`, {
+      const response = await fetch(`${API_URL}/api/guilds/${guildId}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (response.ok) {
@@ -95,7 +96,7 @@ export default function ServerManagePage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/guilds/${guildId}/settings`, {
+      const response = await fetch(`${API_URL}/api/guilds/${guildId}/settings`, {
         method: 'PUT',
         headers: { 
           Authorization: `Bearer ${accessToken}`,
@@ -163,7 +164,7 @@ export default function ServerManagePage() {
             </button>
             <div className="flex items-center gap-3">
               {getGuildIcon() ? (
-                <Image
+                <img
                   src={getGuildIcon()!}
                   alt={guild.name}
                   width={40}

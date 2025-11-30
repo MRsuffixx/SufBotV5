@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-interface User {
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+export interface User {
   id: string;
   discordId: string;
   username: string;
@@ -36,7 +38,7 @@ export const useAuthStore = create<AuthState>()(
       login: async (token: string) => {
         set({ accessToken: token, isLoading: true });
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+          const response = await fetch(`${API_URL}/api/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (response.ok) {
@@ -53,7 +55,7 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         const { accessToken } = get();
         try {
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
+          await fetch(`${API_URL}/api/auth/logout`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${accessToken}` },
             credentials: 'include',
@@ -72,7 +74,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+          const response = await fetch(`${API_URL}/api/auth/me`, {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           if (response.ok) {

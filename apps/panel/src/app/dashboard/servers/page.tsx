@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
-import Image from 'next/image';
 import { 
   Server, 
   Settings, 
@@ -12,6 +11,9 @@ import {
   Shield,
   Bot
 } from 'lucide-react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const DISCORD_CLIENT_ID = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || '1444623911290671114';
 
 interface Guild {
   id: string;
@@ -42,7 +44,7 @@ export default function ServersPage() {
 
   const fetchGuilds = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/guilds`, {
+      const response = await fetch(`${API_URL}/api/guilds`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (response.ok) {
@@ -68,9 +70,8 @@ export default function ServersPage() {
   };
 
   const handleInvite = (guildId: string) => {
-    const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || '1444623911290671114';
     const permissions = '8'; // Administrator
-    const inviteUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=${permissions}&scope=bot%20applications.commands&guild_id=${guildId}`;
+    const inviteUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&permissions=${permissions}&scope=bot%20applications.commands&guild_id=${guildId}`;
     window.open(inviteUrl, '_blank');
   };
 
@@ -148,7 +149,7 @@ export default function ServersPage() {
               >
                 <div className="flex items-center gap-4 mb-4">
                   {getGuildIcon(guild) ? (
-                    <Image
+                    <img
                       src={getGuildIcon(guild)!}
                       alt={guild.name}
                       width={64}

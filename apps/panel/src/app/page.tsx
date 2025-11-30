@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
 import { Bot, Shield, Zap, Users } from 'lucide-react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -16,7 +18,7 @@ export default function HomePage() {
   }, [isAuthenticated, isLoading, router]);
 
   const handleLogin = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/discord`;
+    window.location.href = `${API_URL}/api/auth/discord`;
   };
 
   return (

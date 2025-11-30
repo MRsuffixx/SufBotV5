@@ -14,6 +14,8 @@ import {
   TrendingUp
 } from 'lucide-react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 interface BotStats {
   guildCount: number;
   userCount: number;
@@ -44,7 +46,7 @@ export default function DashboardPage() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bot/stats`, {
+      const response = await fetch(`${API_URL}/api/bot/stats`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (response.ok) {
@@ -82,11 +84,37 @@ export default function DashboardPage() {
             <Bot className="h-8 w-8 text-primary" />
             <span className="text-xl font-bold">SufBot Dashboard</span>
           </div>
+          <nav className="flex items-center gap-6">
+            <button 
+              onClick={() => router.push('/dashboard')}
+              className="text-foreground font-medium"
+            >
+              Dashboard
+            </button>
+            <button 
+              onClick={() => router.push('/dashboard/servers')}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Servers
+            </button>
+          </nav>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
-              Welcome, {user?.username}
+              {user?.username}
             </span>
-            <div className="h-8 w-8 rounded-full bg-primary/20" />
+            {user?.avatar ? (
+              <img 
+                src={`https://cdn.discordapp.com/avatars/${user.discordId}/${user.avatar}.png`}
+                alt={user.username}
+                className="h-8 w-8 rounded-full"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+                <span className="text-sm font-medium text-primary">
+                  {user?.username?.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -163,7 +191,10 @@ export default function DashboardPage() {
         <div className="rounded-xl border bg-card p-6">
           <h3 className="mb-4 text-lg font-semibold">Quick Actions</h3>
           <div className="grid gap-4 md:grid-cols-3">
-            <button className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent">
+            <button 
+              onClick={() => router.push('/dashboard/servers')}
+              className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"
+            >
               <Server className="h-5 w-5 text-primary" />
               <span>Manage Servers</span>
             </button>
