@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
 import WelcomeSettings from '@/components/welcome/WelcomeSettings';
+import AutoResponderSettings from '@/components/autoresponder/AutoResponderSettings';
 import { 
   Bot,
   Settings,
   Shield,
   MessageSquare,
+  MessageCircle,
   Users,
   Coins,
   Bell,
@@ -96,6 +98,8 @@ export default function ServerManagePage() {
   const [prefix, setPrefix] = useState('!');
   const [language, setLanguage] = useState('en');
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
+  const [botNickname, setBotNickname] = useState('');
+  const [savingNickname, setSavingNickname] = useState(false);
   
   // Channels and Roles
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -222,6 +226,29 @@ export default function ServerManagePage() {
     );
   };
 
+  const handleChangeBotNickname = async () => {
+    setSavingNickname(true);
+    try {
+      const response = await fetch(`${API_URL}/api/guilds/${guildId}/bot-nickname`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ nickname: botNickname }),
+      });
+      
+      if (response.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch (error) {
+      console.error('Failed to change bot nickname:', error);
+    } finally {
+      setSavingNickname(false);
+    }
+  };
+
   const getGuildIcon = () => {
     if (guild?.icon) {
       return `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`;
@@ -314,6 +341,7 @@ export default function ServerManagePage() {
                 { id: 'modules', name: 'Modules', icon: Bot },
                 { id: 'moderation', name: 'Moderation', icon: Shield },
                 { id: 'welcome', name: 'Welcome', icon: Bell },
+                { id: 'autoresponder', name: 'Auto Responder', icon: MessageCircle },
                 { id: 'economy', name: 'Economy', icon: Coins },
               ].map((tab) => (
                 <button
@@ -339,7 +367,39 @@ export default function ServerManagePage() {
                 <div className="rounded-xl border bg-card p-6">
                   <h2 className="text-xl font-semibold mb-4">General Settings</h2>
                   
-                  <div className="space-y-4">
+                  <div className="space-y-6">
+                    {/* Bot Nickname */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Bot Nickname (Server Only)
+                      </label>
+                      <div className="flex gap-2 max-w-md">
+                        <input
+                          type="text"
+                          value={botNickname}
+                          onChange={(e) => setBotNickname(e.target.value)}
+                          className="flex-1 px-3 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="SufBot"
+                          maxLength={32}
+                        />
+                        <button
+                          onClick={handleChangeBotNickname}
+                          disabled={savingNickname}
+                          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {savingNickname ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Apply'
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Change the bot's display name on this server only
+                      </p>
+                    </div>
+
+                    {/* Command Prefix */}
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         Command Prefix
@@ -357,21 +417,26 @@ export default function ServerManagePage() {
                       </p>
                     </div>
 
+                    {/* Language - Coming Soon */}
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         Language
                       </label>
-                      <select
-                        value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
-                        className="w-full max-w-xs px-3 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                      >
-                        <option value="en">English</option>
-                        <option value="tr">Türkçe</option>
-                        <option value="de">Deutsch</option>
-                        <option value="fr">Français</option>
-                        <option value="es">Español</option>
-                      </select>
+                      <div className="relative max-w-xs">
+                        <select
+                          value={language}
+                          disabled
+                          className="w-full px-3 py-2 rounded-lg border bg-background/50 text-muted-foreground cursor-not-allowed"
+                        >
+                          <option value="en">English</option>
+                        </select>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full font-medium">
+                          Coming Soon
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Multi-language support will be available in a future update
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -467,6 +532,15 @@ export default function ServerManagePage() {
                   roles={roles}
                 />
               </div>
+            )}
+
+            {activeTab === 'autoresponder' && (
+              <AutoResponderSettings
+                guildId={guildId}
+                accessToken={accessToken || ''}
+                channels={channels}
+                roles={roles}
+              />
             )}
 
             {activeTab === 'economy' && (

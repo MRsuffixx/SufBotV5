@@ -140,4 +140,74 @@ export class GuildsController {
   ) {
     return this.guildsService.getGuildRoles(guildId);
   }
+
+  @Put(':id/bot-nickname')
+  @ApiOperation({ summary: 'Change bot nickname in guild' })
+  async changeBotNickname(
+    @Param('id') guildId: string,
+    @CurrentUser('id') userId: string,
+    @Body() body: { nickname: string },
+  ) {
+    return this.guildsService.changeBotNickname(guildId, body.nickname);
+  }
+
+  // Auto Responder endpoints
+  @Get(':id/auto-responders')
+  @ApiOperation({ summary: 'Get all auto responders for a guild' })
+  async getAutoResponders(
+    @Param('id') guildId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.guildsService.getAutoResponders(guildId);
+  }
+
+  @Post(':id/auto-responders')
+  @ApiOperation({ summary: 'Create a new auto responder' })
+  async createAutoResponder(
+    @Param('id') guildId: string,
+    @CurrentUser('id') userId: string,
+    @Body() body: {
+      trigger: string;
+      wildcard: boolean;
+      sendAsReply: boolean;
+      replies: string[];
+      allowedRoles: string[];
+      disabledRoles: string[];
+      allowedChannels: string[];
+      disabledChannels: string[];
+    },
+  ) {
+    return this.guildsService.createAutoResponder(guildId, body);
+  }
+
+  @Put(':id/auto-responders/:responderId')
+  @ApiOperation({ summary: 'Update an auto responder' })
+  async updateAutoResponder(
+    @Param('id') guildId: string,
+    @Param('responderId') responderId: string,
+    @CurrentUser('id') userId: string,
+    @Body() body: {
+      trigger?: string;
+      wildcard?: boolean;
+      sendAsReply?: boolean;
+      replies?: string[];
+      allowedRoles?: string[];
+      disabledRoles?: string[];
+      allowedChannels?: string[];
+      disabledChannels?: string[];
+      enabled?: boolean;
+    },
+  ) {
+    return this.guildsService.updateAutoResponder(guildId, responderId, body);
+  }
+
+  @Delete(':id/auto-responders/:responderId')
+  @ApiOperation({ summary: 'Delete an auto responder' })
+  async deleteAutoResponder(
+    @Param('id') guildId: string,
+    @Param('responderId') responderId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.guildsService.deleteAutoResponder(guildId, responderId);
+  }
 }

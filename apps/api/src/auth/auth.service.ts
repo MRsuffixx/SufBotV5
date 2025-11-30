@@ -28,9 +28,27 @@ export class AuthService {
   ) {}
 
   async validateDiscordUser(profile: DiscordProfile, discordAccessToken?: string) {
+    // Check if user is a bot owner from .env
+    const botOwnerIdsStr = this.configService.get<string>('BOT_OWNER_IDS', '');
+    const botOwnerIds = botOwnerIdsStr.split(',').map(id => id.trim()).filter(id => id.length > 0);
+    const isBotOwner = botOwnerIds.includes(profile.id);
+    
+    console.log(`[Auth] Validating user: ${profile.username} (${profile.id})`);
+    console.log(`[Auth] Bot owner IDs from env: [${botOwnerIds.join(', ')}]`);
+    console.log(`[Auth] Is bot owner: ${isBotOwner}`);
+    
     let user = await this.prisma.user.findUnique({
       where: { discordId: profile.id },
     });
+
+    // Determine user role
+    let role = UserRole.USER;
+    if (isBotOwner) {
+      role = UserRole.OWNER;
+    } else if (user?.role === UserRole.ADMIN || user?.role === UserRole.MODERATOR) {
+      // Preserve existing elevated roles
+      role = user.role;
+    }
 
     if (!user) {
       user = await this.prisma.user.create({
@@ -40,7 +58,7 @@ export class AuthService {
           discriminator: profile.discriminator,
           avatar: profile.avatar,
           email: profile.email,
-          role: UserRole.USER,
+          role,
         },
       });
     } else {
@@ -51,6 +69,8 @@ export class AuthService {
           discriminator: profile.discriminator,
           avatar: profile.avatar,
           email: profile.email,
+          // Update role if user is bot owner (always set to OWNER)
+          ...(isBotOwner && { role: UserRole.OWNER }),
         },
       });
     }

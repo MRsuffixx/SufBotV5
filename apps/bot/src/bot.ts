@@ -2,11 +2,13 @@
 // SUFBOT V5 - Bot Client
 // ============================================
 
-import { Client, GatewayIntentBits, Partials, Collection, REST, Routes, ActivityType } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Collection, REST, Routes, ActivityType, EmbedBuilder } from 'discord.js';
 import { config } from './config';
 import { logger } from './utils/logger';
 import { prisma } from '@sufbot/database';
 import type { Command, Module } from './types';
+import { slashCommands, commandModuleMap, commandCooldowns } from './commands';
+import * as handlers from './commands/handlers';
 
 // Extend Client
 declare module 'discord.js' {
@@ -77,16 +79,85 @@ async function getNextCaseNumber(guildId: string): Promise<number> {
   return (lastCase?.caseNumber || 0) + 1;
 }
 
+// Status rotation state
+let statusRotationInterval: NodeJS.Timeout | null = null;
+let currentActivityIndex = 0;
+
+// Activity type mapping
+const ACTIVITY_TYPE_MAP: Record<string, ActivityType> = {
+  'PLAYING': ActivityType.Playing,
+  'WATCHING': ActivityType.Watching,
+  'LISTENING': ActivityType.Listening,
+  'STREAMING': ActivityType.Streaming,
+  'COMPETING': ActivityType.Competing,
+};
+
+// Load and apply bot status from database
+async function loadBotStatus() {
+  try {
+    const config = await prisma.botConfig.findFirst();
+    
+    if (!config) {
+      // Use default status
+      client.user?.setPresence({
+        activities: [{ name: '/help | sufbot.com', type: ActivityType.Watching }],
+        status: 'online',
+      });
+      return;
+    }
+
+    const activities = JSON.parse(config.activities as string);
+    
+    // Clear existing rotation
+    if (statusRotationInterval) {
+      clearInterval(statusRotationInterval);
+      statusRotationInterval = null;
+    }
+
+    // Apply initial status
+    if (activities.length > 0) {
+      applyActivity(activities[0], config.status as any);
+    }
+
+    // Set up rotation if enabled
+    if (config.rotateStatus && activities.length > 1) {
+      statusRotationInterval = setInterval(() => {
+        currentActivityIndex = (currentActivityIndex + 1) % activities.length;
+        applyActivity(activities[currentActivityIndex], config.status as any);
+      }, config.rotateInterval * 1000);
+    }
+
+    logger.info(`Bot status loaded: ${config.status}, ${activities.length} activities, rotation: ${config.rotateStatus}`);
+  } catch (error) {
+    logger.error('Failed to load bot status:', error);
+    // Fallback to default
+    client.user?.setPresence({
+      activities: [{ name: '/help | sufbot.com', type: ActivityType.Watching }],
+      status: 'online',
+    });
+  }
+}
+
+function applyActivity(activity: any, status: 'online' | 'idle' | 'dnd' | 'invisible') {
+  const activityType = ACTIVITY_TYPE_MAP[activity.type] || ActivityType.Playing;
+  
+  client.user?.setPresence({
+    activities: [{
+      name: activity.name,
+      type: activityType,
+      url: activity.type === 'STREAMING' ? activity.url : undefined,
+    }],
+    status,
+  });
+}
+
 // Ready event
 client.once('ready', async () => {
   logger.info(`Bot logged in as ${client.user?.tag}`);
   logger.info(`Serving ${client.guilds.cache.size} guilds`);
 
-  // Set bot status
-  client.user?.setPresence({
-    activities: [{ name: '/help | sufbot.com', type: ActivityType.Watching }],
-    status: 'online',
-  });
+  // Load bot status from database
+  await loadBotStatus();
 
   // Sync all guilds to database
   logger.info('Syncing guilds to database...');
@@ -97,7 +168,38 @@ client.once('ready', async () => {
 
   // Register slash commands
   await registerCommands();
+
+  // Start stats recording interval (every 30 seconds)
+  setInterval(recordBotStats, 30000);
+  // Record initial stats
+  await recordBotStats();
 });
+
+// Record bot stats to database
+async function recordBotStats() {
+  try {
+    const memUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+    
+    // Calculate CPU percentage (rough estimate)
+    const cpuPercent = (cpuUsage.user + cpuUsage.system) / 1000000 / process.uptime() * 100;
+    
+    await prisma.botStats.create({
+      data: {
+        guildCount: client.guilds.cache.size,
+        userCount: client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0),
+        channelCount: client.channels.cache.size,
+        memoryUsage: Math.round(memUsage.heapUsed / 1024 / 1024), // MB
+        cpuUsage: Math.min(cpuPercent, 100),
+        uptime: Math.floor(process.uptime()),
+      },
+    });
+    
+    logger.debug(`Stats recorded: ${client.guilds.cache.size} guilds, ${client.users.cache.size} users`);
+  } catch (error) {
+    logger.error('Failed to record stats:', error);
+  }
+}
 
 // Guild join event - sync new guild
 client.on('guildCreate', async (guild) => {
@@ -288,208 +390,275 @@ client.on('guildMemberRemove', async (member) => {
   }
 });
 
-// Message handler for prefix commands
+// Auto Responder handler
 client.on('messageCreate', async (message) => {
-  if (message.author.bot) return;
-  if (!message.guild) return;
+  // Ignore bots and DMs
+  if (message.author.bot || !message.guild) return;
 
-  const prefix = '!'; // Default prefix
-  if (!message.content.startsWith(prefix)) return;
-
-  const args = message.content.slice(prefix.length).trim().split(/ +/);
-  const commandName = args.shift()?.toLowerCase();
-
-  if (!commandName) return;
-
-  // Handle basic commands
-  if (commandName === 'ping') {
-    const sent = await message.reply('Pinging...');
-    await sent.edit(`🏓 Pong! Latency: ${sent.createdTimestamp - message.createdTimestamp}ms | API: ${Math.round(client.ws.ping)}ms`);
-  }
-
-  if (commandName === 'help') {
-    await message.reply({
-      embeds: [{
-        title: '📚 SufBot Help',
-        description: 'Available commands:',
-        fields: [
-          { name: '!ping', value: 'Check bot latency', inline: true },
-          { name: '!help', value: 'Show this help', inline: true },
-          { name: '!serverinfo', value: 'Server information', inline: true },
-          { name: '!userinfo', value: 'User information', inline: true },
-          { name: '!ban', value: 'Ban a user (Admin)', inline: true },
-          { name: '!kick', value: 'Kick a user (Admin)', inline: true },
-        ],
-        color: 0x5865F2,
-        footer: { text: 'Use /help for slash commands' },
-      }],
+  try {
+    // Get auto responders for this guild
+    const responders = await prisma.autoResponder.findMany({
+      where: { 
+        guildId: message.guild.id,
+        enabled: true,
+      },
     });
-  }
 
-  if (commandName === 'serverinfo') {
-    const guild = message.guild;
-    await message.reply({
-      embeds: [{
-        title: `📊 ${guild.name}`,
-        thumbnail: { url: guild.iconURL() || '' },
-        fields: [
-          { name: 'Owner', value: `<@${guild.ownerId}>`, inline: true },
-          { name: 'Members', value: guild.memberCount.toString(), inline: true },
-          { name: 'Channels', value: guild.channels.cache.size.toString(), inline: true },
-          { name: 'Roles', value: guild.roles.cache.size.toString(), inline: true },
-          { name: 'Created', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: true },
-          { name: 'Boost Level', value: guild.premiumTier.toString(), inline: true },
-        ],
-        color: 0x5865F2,
-      }],
-    });
-  }
+    if (responders.length === 0) return;
 
-  if (commandName === 'userinfo') {
-    const target = message.mentions.members?.first() || message.member;
-    if (!target) return;
-    
-    await message.reply({
-      embeds: [{
-        title: `👤 ${target.user.tag}`,
-        thumbnail: { url: target.user.displayAvatarURL() },
-        fields: [
-          { name: 'ID', value: target.id, inline: true },
-          { name: 'Nickname', value: target.nickname || 'None', inline: true },
-          { name: 'Joined Server', value: `<t:${Math.floor((target.joinedTimestamp || 0) / 1000)}:R>`, inline: true },
-          { name: 'Account Created', value: `<t:${Math.floor(target.user.createdTimestamp / 1000)}:R>`, inline: true },
-          { name: 'Roles', value: target.roles.cache.map(r => r.name).slice(0, 10).join(', ') || 'None', inline: false },
-        ],
-        color: 0x5865F2,
-      }],
-    });
-  }
+    const content = message.content.toLowerCase();
+    const memberRoles = message.member?.roles.cache.map(r => r.id) || [];
 
-  // Moderation commands
-  if (commandName === 'ban') {
-    if (!message.member?.permissions.has('BanMembers')) {
-      return message.reply('❌ You need Ban Members permission!');
-    }
-    const target = message.mentions.members?.first();
-    if (!target) return message.reply('❌ Please mention a user to ban!');
-    const reason = args.slice(1).join(' ') || 'No reason provided';
-    
-    try {
-      await target.ban({ reason });
-      await message.reply(`✅ Banned ${target.user.tag} | Reason: ${reason}`);
-      
-      // Log to database
-      const caseNumber = await getNextCaseNumber(message.guild.id);
-      await prisma.modLog.create({
-        data: {
-          guildId: message.guild.id,
-          caseNumber,
-          moderatorId: message.author.id,
-          userId: target.id,
-          action: 'BAN',
-          reason,
-        },
-      });
-    } catch (error) {
-      await message.reply('❌ Failed to ban user!');
-    }
-  }
+    for (const responder of responders) {
+      // Check trigger
+      const trigger = responder.trigger.toLowerCase();
+      let matches = false;
 
-  if (commandName === 'kick') {
-    if (!message.member?.permissions.has('KickMembers')) {
-      return message.reply('❌ You need Kick Members permission!');
+      if (responder.wildcard) {
+        // Wildcard: check if message contains trigger
+        matches = content.includes(trigger);
+      } else {
+        // Exact match: message equals trigger
+        matches = content === trigger;
+      }
+
+      if (!matches) continue;
+
+      // Check role restrictions
+      if (responder.allowedRoles.length > 0) {
+        const hasAllowedRole = responder.allowedRoles.some(r => memberRoles.includes(r));
+        if (!hasAllowedRole) continue;
+      }
+
+      if (responder.disabledRoles.length > 0) {
+        const hasDisabledRole = responder.disabledRoles.some(r => memberRoles.includes(r));
+        if (hasDisabledRole) continue;
+      }
+
+      // Check channel restrictions
+      if (responder.allowedChannels.length > 0) {
+        if (!responder.allowedChannels.includes(message.channel.id)) continue;
+      }
+
+      if (responder.disabledChannels.length > 0) {
+        if (responder.disabledChannels.includes(message.channel.id)) continue;
+      }
+
+      // Get replies and select one randomly
+      const replies = JSON.parse(responder.replies);
+      if (replies.length === 0) continue;
+
+      const selectedReply = replies[Math.floor(Math.random() * replies.length)];
+
+      // Process variables
+      const processVariables = (text: string): string => {
+        return text
+          .replace(/{user}/g, `<@${message.author.id}>`)
+          .replace(/{user\.name}/g, message.author.username)
+          .replace(/{user\.id}/g, message.author.id)
+          .replace(/{server}/g, message.guild?.name || '')
+          .replace(/{channel}/g, message.channel.toString())
+          .replace(/{membercount}/g, message.guild?.memberCount.toString() || '0');
+      };
+
+      const reply = processVariables(selectedReply);
+
+      // Send response
+      if (responder.sendAsReply) {
+        await message.reply(reply);
+      } else {
+        await message.channel.send(reply);
+      }
+
+      logger.debug(`Auto responder triggered: "${responder.trigger}" in ${message.guild.name}`);
+      break; // Only respond once per message
     }
-    const target = message.mentions.members?.first();
-    if (!target) return message.reply('❌ Please mention a user to kick!');
-    const reason = args.slice(1).join(' ') || 'No reason provided';
-    
-    try {
-      await target.kick(reason);
-      await message.reply(`✅ Kicked ${target.user.tag} | Reason: ${reason}`);
-      
-      // Log to database
-      const caseNumber = await getNextCaseNumber(message.guild.id);
-      await prisma.modLog.create({
-        data: {
-          guildId: message.guild.id,
-          caseNumber,
-          moderatorId: message.author.id,
-          userId: target.id,
-          action: 'KICK',
-          reason,
-        },
-      });
-    } catch (error) {
-      await message.reply('❌ Failed to kick user!');
-    }
+  } catch (error) {
+    logger.error('Error in auto responder:', error);
   }
 });
+
+// Check if command is disabled for a guild
+async function isCommandDisabled(guildId: string, commandName: string): Promise<boolean> {
+  const settings = await prisma.guildSettings.findUnique({
+    where: { guildId },
+  });
+  
+  if (!settings) return false;
+  
+  // Check if command is directly disabled
+  if (settings.disabledCommands.includes(commandName)) {
+    return true;
+  }
+  
+  // Check if the command's module is disabled
+  const module = commandModuleMap[commandName];
+  if (module && settings.disabledModules.includes(module)) {
+    return true;
+  }
+  
+  // Check module-specific settings
+  if (module === 'moderation' && !settings.moderationEnabled) {
+    return true;
+  }
+  if (module === 'economy' && !settings.economyEnabled) {
+    return true;
+  }
+  
+  return false;
+}
+
+// Check cooldown
+function checkCooldown(userId: string, commandName: string): number | null {
+  if (!client.cooldowns.has(commandName)) {
+    client.cooldowns.set(commandName, new Collection());
+  }
+  
+  const now = Date.now();
+  const timestamps = client.cooldowns.get(commandName)!;
+  const cooldownAmount = (commandCooldowns[commandName] || 3) * 1000;
+  
+  if (timestamps.has(userId)) {
+    const expirationTime = timestamps.get(userId)! + cooldownAmount;
+    
+    if (now < expirationTime) {
+      const timeLeft = (expirationTime - now) / 1000;
+      return timeLeft;
+    }
+  }
+  
+  timestamps.set(userId, now);
+  setTimeout(() => timestamps.delete(userId), cooldownAmount);
+  
+  return null;
+}
 
 // Slash command handler
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
+  if (!interaction.guild) {
+    return interaction.reply({ content: '❌ Commands can only be used in servers!', ephemeral: true });
+  }
 
   const { commandName } = interaction;
-
-  if (commandName === 'ping') {
-    await interaction.reply(`🏓 Pong! Latency: ${Date.now() - interaction.createdTimestamp}ms | API: ${Math.round(client.ws.ping)}ms`);
-  }
-
-  if (commandName === 'help') {
-    await interaction.reply({
-      embeds: [{
-        title: '📚 SufBot Help',
-        description: 'A powerful Discord bot for server management',
-        fields: [
-          { name: '/ping', value: 'Check bot latency', inline: true },
-          { name: '/help', value: 'Show this help', inline: true },
-          { name: '/serverinfo', value: 'Server information', inline: true },
-        ],
-        color: 0x5865F2,
-      }],
-    });
-  }
-
-  if (commandName === 'serverinfo') {
-    const guild = interaction.guild;
-    if (!guild) return;
+  
+  // Check if command is disabled
+  const disabled = await isCommandDisabled(interaction.guild.id, commandName);
+  if (disabled) {
+    const embed = new EmbedBuilder()
+      .setTitle('🚫 Command Disabled')
+      .setDescription(`The \`/${commandName}\` command is disabled on this server.`)
+      .setColor(0xFF0000)
+      .setFooter({ text: 'Contact a server administrator to enable this command.' });
     
-    await interaction.reply({
-      embeds: [{
-        title: `📊 ${guild.name}`,
-        thumbnail: { url: guild.iconURL() || '' },
-        fields: [
-          { name: 'Owner', value: `<@${guild.ownerId}>`, inline: true },
-          { name: 'Members', value: guild.memberCount.toString(), inline: true },
-          { name: 'Channels', value: guild.channels.cache.size.toString(), inline: true },
-        ],
-        color: 0x5865F2,
-      }],
+    return interaction.reply({ embeds: [embed], ephemeral: true });
+  }
+  
+  // Check cooldown
+  const cooldownTime = checkCooldown(interaction.user.id, commandName);
+  if (cooldownTime !== null) {
+    return interaction.reply({ 
+      content: `⏳ Please wait **${cooldownTime.toFixed(1)}s** before using \`/${commandName}\` again.`, 
+      ephemeral: true 
     });
+  }
+  
+  try {
+    // Route to appropriate handler
+    switch (commandName) {
+      // General commands
+      case 'ping':
+        await handlers.handlePing(interaction);
+        break;
+      case 'help':
+        await handlers.handleHelp(interaction);
+        break;
+      case 'serverinfo':
+        await handlers.handleServerinfo(interaction);
+        break;
+      case 'userinfo':
+        await handlers.handleUserinfo(interaction);
+        break;
+      case 'avatar':
+        await handlers.handleAvatar(interaction);
+        break;
+      case 'botinfo':
+        await handlers.handleBotinfo(interaction, client);
+        break;
+        
+      // Moderation commands
+      case 'ban':
+        await handlers.handleBan(interaction);
+        break;
+      case 'kick':
+        await handlers.handleKick(interaction);
+        break;
+      case 'timeout':
+        await handlers.handleTimeout(interaction);
+        break;
+      case 'untimeout':
+        await handlers.handleUntimeout(interaction);
+        break;
+      case 'warn':
+        await handlers.handleWarn(interaction);
+        break;
+      case 'warnings':
+        await handlers.handleWarnings(interaction);
+        break;
+      case 'clearwarnings':
+        await handlers.handleClearwarnings(interaction);
+        break;
+      case 'purge':
+        await handlers.handlePurge(interaction);
+        break;
+      case 'slowmode':
+        await handlers.handleSlowmode(interaction);
+        break;
+      case 'lock':
+        await handlers.handleLock(interaction);
+        break;
+      case 'unlock':
+        await handlers.handleUnlock(interaction);
+        break;
+      case 'modlogs':
+        await handlers.handleModlogs(interaction);
+        break;
+        
+      // Utility commands
+      case 'poll':
+        await handlers.handlePoll(interaction);
+        break;
+      case 'remind':
+        await handlers.handleRemind(interaction);
+        break;
+        
+      default:
+        await interaction.reply({ content: '❌ Unknown command!', ephemeral: true });
+    }
+  } catch (error) {
+    logger.error(`Error executing command ${commandName}:`, error);
+    
+    const errorEmbed = new EmbedBuilder()
+      .setTitle('❌ Error')
+      .setDescription('An error occurred while executing this command.')
+      .setColor(0xFF0000);
+    
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
+    } else {
+      await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+    }
   }
 });
 
 // Register slash commands
 async function registerCommands() {
-  const commands = [
-    {
-      name: 'ping',
-      description: 'Check bot latency',
-    },
-    {
-      name: 'help',
-      description: 'Show help information',
-    },
-    {
-      name: 'serverinfo',
-      description: 'Show server information',
-    },
-  ];
+  const commands = slashCommands.map(cmd => cmd.data);
 
   const rest = new REST({ version: '10' }).setToken(config.discord.token);
 
   try {
-    logger.info('Registering slash commands...');
+    logger.info(`Registering ${commands.length} slash commands...`);
     
     // Register globally
     await rest.put(
@@ -497,7 +666,7 @@ async function registerCommands() {
       { body: commands },
     );
     
-    logger.info('Slash commands registered!');
+    logger.info(`Successfully registered ${commands.length} slash commands!`);
   } catch (error) {
     logger.error('Failed to register commands:', error);
   }

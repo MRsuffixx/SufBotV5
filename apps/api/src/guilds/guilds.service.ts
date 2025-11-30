@@ -356,4 +356,121 @@ export class GuildsService {
       return [];
     }
   }
+
+  async changeBotNickname(guildId: string, nickname: string) {
+    const botToken = process.env.DISCORD_TOKEN;
+    
+    if (!botToken) {
+      throw new Error('DISCORD_TOKEN not found');
+    }
+
+    try {
+      // Get bot's client ID from token
+      const clientId = process.env.DISCORD_CLIENT_ID;
+      
+      const response = await fetch(`${DISCORD_API}/guilds/${guildId}/members/@me`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bot ${botToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nick: nickname || null }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Failed to change nickname:', error);
+        throw new Error('Failed to change bot nickname');
+      }
+
+      return { success: true, nickname };
+    } catch (error) {
+      console.error('Error changing bot nickname:', error);
+      throw error;
+    }
+  }
+
+  // Auto Responder methods
+  async getAutoResponders(guildId: string) {
+    const responders = await this.prisma.autoResponder.findMany({
+      where: { guildId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return responders.map(r => ({
+      ...r,
+      replies: JSON.parse(r.replies),
+    }));
+  }
+
+  async createAutoResponder(guildId: string, data: {
+    trigger: string;
+    wildcard: boolean;
+    sendAsReply: boolean;
+    replies: string[];
+    allowedRoles: string[];
+    disabledRoles: string[];
+    allowedChannels: string[];
+    disabledChannels: string[];
+  }) {
+    // Validate replies (max 10, min 1)
+    if (!data.replies || data.replies.length === 0) {
+      throw new Error('At least one reply is required');
+    }
+    if (data.replies.length > 10) {
+      throw new Error('Maximum 10 replies allowed');
+    }
+
+    return this.prisma.autoResponder.create({
+      data: {
+        guildId,
+        trigger: data.trigger,
+        wildcard: data.wildcard,
+        sendAsReply: data.sendAsReply,
+        replies: JSON.stringify(data.replies),
+        allowedRoles: data.allowedRoles || [],
+        disabledRoles: data.disabledRoles || [],
+        allowedChannels: data.allowedChannels || [],
+        disabledChannels: data.disabledChannels || [],
+      },
+    });
+  }
+
+  async updateAutoResponder(guildId: string, responderId: string, data: {
+    trigger?: string;
+    wildcard?: boolean;
+    sendAsReply?: boolean;
+    replies?: string[];
+    allowedRoles?: string[];
+    disabledRoles?: string[];
+    allowedChannels?: string[];
+    disabledChannels?: string[];
+    enabled?: boolean;
+  }) {
+    // Validate replies if provided
+    if (data.replies) {
+      if (data.replies.length === 0) {
+        throw new Error('At least one reply is required');
+      }
+      if (data.replies.length > 10) {
+        throw new Error('Maximum 10 replies allowed');
+      }
+    }
+
+    const updateData: any = { ...data };
+    if (data.replies) {
+      updateData.replies = JSON.stringify(data.replies);
+    }
+
+    return this.prisma.autoResponder.update({
+      where: { id: responderId, guildId },
+      data: updateData,
+    });
+  }
+
+  async deleteAutoResponder(guildId: string, responderId: string) {
+    return this.prisma.autoResponder.delete({
+      where: { id: responderId, guildId },
+    });
+  }
 }

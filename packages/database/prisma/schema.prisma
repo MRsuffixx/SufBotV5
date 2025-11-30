@@ -474,3 +474,49 @@ model CommandStats {
   @@index([guildId])
   @@index([createdAt])
 }
+
+// ============================================
+// Bot Configuration (Owner Only)
+// ============================================
+
+model BotConfig {
+  id              String   @id @default(cuid())
+  
+  status          String   @default("online") // online, idle, dnd, invisible
+  activities      String   @default("[]") // JSON array of activities
+  rotateStatus    Boolean  @default(false)
+  rotateInterval  Int      @default(30) // seconds
+  
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================
+// Auto Responder
+// ============================================
+
+model AutoResponder {
+  id              String   @id @default(cuid())
+  guildId         String
+  
+  trigger         String   // The trigger word/phrase
+  wildcard        Boolean  @default(false) // Search within message
+  sendAsReply     Boolean  @default(true) // Send as reply to the message
+  
+  replies         String   // JSON array of replies (max 10)
+  
+  // Role restrictions
+  allowedRoles    String[] // Only these roles can trigger (empty = all)
+  disabledRoles   String[] // These roles cannot trigger
+  
+  // Channel restrictions  
+  allowedChannels String[] // Only in these channels (empty = all)
+  disabledChannels String[] // Not in these channels
+  
+  enabled         Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([guildId])
+  @@index([trigger])
+}

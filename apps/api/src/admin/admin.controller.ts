@@ -6,6 +6,18 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
+interface BotConfigDto {
+  status: 'online' | 'idle' | 'dnd' | 'invisible';
+  activities: Array<{
+    id: string;
+    type: 'PLAYING' | 'WATCHING' | 'LISTENING' | 'STREAMING' | 'COMPETING';
+    name: string;
+    url?: string;
+  }>;
+  rotateStatus: boolean;
+  rotateInterval: number;
+}
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -52,5 +64,23 @@ export class AdminController {
   @ApiOperation({ summary: 'Delete API key' })
   async deleteApiKey(@Param('id') keyId: string) {
     return this.adminService.deleteApiKey(keyId);
+  }
+
+  @Get('guilds')
+  @ApiOperation({ summary: 'Get all guilds (bot owner only)' })
+  async getAllGuilds() {
+    return this.adminService.getAllGuilds();
+  }
+
+  @Get('bot-config')
+  @ApiOperation({ summary: 'Get bot configuration' })
+  async getBotConfig() {
+    return this.adminService.getBotConfig();
+  }
+
+  @Put('bot-config')
+  @ApiOperation({ summary: 'Update bot configuration' })
+  async updateBotConfig(@Body() config: BotConfigDto) {
+    return this.adminService.updateBotConfig(config);
   }
 }
