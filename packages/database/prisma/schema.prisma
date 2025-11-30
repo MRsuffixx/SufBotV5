@@ -1,0 +1,471 @@
+// ============================================
+// SUFBOT V5 - Prisma Schema
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User & Authentication
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  discordId     String    @unique
+  username      String
+  discriminator String?
+  avatar        String?
+  email         String?
+  role          UserRole  @default(USER)
+  
+  refreshTokens RefreshToken[]
+  apiKeys       ApiKey[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([discordId])
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+  OWNER
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  key         String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions String[]  @default([])
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([key])
+  @@index([userId])
+}
+
+// ============================================
+// Guild Configuration
+// ============================================
+
+model Guild {
+  id        String   @id // Discord Guild ID
+  name      String
+  icon      String?
+  ownerId   String
+  
+  // Settings
+  settings  GuildSettings?
+  
+  // Features
+  welcomeConfig   WelcomeConfig?
+  moderationConfig ModerationConfig?
+  economyConfig   EconomyConfig?
+  autoRoles       AutoRole[]
+  logChannels     LogChannel[]
+  filters         Filter[]
+  customCommands  CustomCommand[]
+  
+  // Data
+  warnings        Warning[]
+  modLogs         ModLog[]
+  economyUsers    EconomyUser[]
+  
+  // Metadata
+  premium         Boolean  @default(false)
+  premiumUntil    DateTime?
+  joinedAt        DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model GuildSettings {
+  id              String   @id @default(cuid())
+  guildId         String   @unique
+  guild           Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  prefix          String   @default("!")
+  language        String   @default("en")
+  timezone        String   @default("UTC")
+  
+  // Module toggles
+  moderationEnabled Boolean @default(true)
+  economyEnabled    Boolean @default(false)
+  welcomeEnabled    Boolean @default(false)
+  loggingEnabled    Boolean @default(true)
+  autoModEnabled    Boolean @default(false)
+  
+  // Disabled commands
+  disabledCommands  String[] @default([])
+  disabledModules   String[] @default([])
+  
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================
+// Welcome System
+// ============================================
+
+model WelcomeConfig {
+  id              String   @id @default(cuid())
+  guildId         String   @unique
+  guild           Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  enabled         Boolean  @default(false)
+  channelId       String?
+  message         String?  @default("Welcome {user} to {server}!")
+  embedEnabled    Boolean  @default(false)
+  embedColor      String?  @default("#5865F2")
+  embedTitle      String?
+  embedDescription String?
+  embedImage      String?
+  embedThumbnail  Boolean  @default(true)
+  
+  // Leave message
+  leaveEnabled    Boolean  @default(false)
+  leaveChannelId  String?
+  leaveMessage    String?  @default("Goodbye {user}!")
+  
+  // DM welcome
+  dmEnabled       Boolean  @default(false)
+  dmMessage       String?
+  
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================
+// Auto Roles
+// ============================================
+
+model AutoRole {
+  id        String   @id @default(cuid())
+  guildId   String
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  roleId    String
+  delay     Int      @default(0) // Delay in seconds
+  enabled   Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, roleId])
+  @@index([guildId])
+}
+
+// ============================================
+// Moderation System
+// ============================================
+
+model ModerationConfig {
+  id              String   @id @default(cuid())
+  guildId         String   @unique
+  guild           Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  // Mute settings
+  muteRoleId      String?
+  
+  // Auto-mod thresholds
+  warnThreshold   Int      @default(3)
+  warnAction      String   @default("mute") // mute, kick, ban
+  warnActionDuration Int?  // Duration in minutes for mute
+  
+  // Logging
+  modLogChannelId String?
+  
+  updatedAt       DateTime @updatedAt
+}
+
+model Warning {
+  id        String   @id @default(cuid())
+  guildId   String
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  userId    String   // Discord User ID
+  moderatorId String
+  reason    String
+  
+  createdAt DateTime @default(now())
+
+  @@index([guildId, userId])
+}
+
+model ModLog {
+  id          String   @id @default(cuid())
+  guildId     String
+  guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  caseNumber  Int
+  action      ModAction
+  userId      String
+  moderatorId String
+  reason      String?
+  duration    Int?     // Duration in seconds for temp actions
+  
+  createdAt   DateTime @default(now())
+
+  @@unique([guildId, caseNumber])
+  @@index([guildId])
+  @@index([userId])
+}
+
+enum ModAction {
+  WARN
+  MUTE
+  UNMUTE
+  KICK
+  BAN
+  UNBAN
+  TIMEOUT
+  UNTIMEOUT
+}
+
+// ============================================
+// Filter System
+// ============================================
+
+model Filter {
+  id        String     @id @default(cuid())
+  guildId   String
+  guild     Guild      @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  type      FilterType
+  enabled   Boolean    @default(true)
+  
+  // For word filter
+  words     String[]   @default([])
+  
+  // For link filter
+  allowedDomains String[] @default([])
+  
+  // For caps filter
+  capsThreshold Int?    @default(70) // Percentage
+  minLength     Int?    @default(10)
+  
+  // Actions
+  action    String     @default("delete") // delete, warn, mute
+  
+  // Exempt
+  exemptRoles    String[] @default([])
+  exemptChannels String[] @default([])
+  
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([guildId, type])
+  @@index([guildId])
+}
+
+enum FilterType {
+  WORDS
+  LINKS
+  CAPS
+  SPAM
+  INVITES
+  MENTIONS
+}
+
+// ============================================
+// Logging System
+// ============================================
+
+model LogChannel {
+  id        String   @id @default(cuid())
+  guildId   String
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  type      LogType
+  channelId String
+  enabled   Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, type])
+  @@index([guildId])
+}
+
+enum LogType {
+  MESSAGE_DELETE
+  MESSAGE_EDIT
+  MEMBER_JOIN
+  MEMBER_LEAVE
+  MEMBER_BAN
+  MEMBER_UNBAN
+  ROLE_CREATE
+  ROLE_DELETE
+  CHANNEL_CREATE
+  CHANNEL_DELETE
+  VOICE_STATE
+  MODERATION
+}
+
+// ============================================
+// Economy System
+// ============================================
+
+model EconomyConfig {
+  id              String   @id @default(cuid())
+  guildId         String   @unique
+  guild           Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  currencyName    String   @default("coins")
+  currencySymbol  String   @default("🪙")
+  
+  dailyAmount     Int      @default(100)
+  dailyCooldown   Int      @default(86400) // 24 hours in seconds
+  
+  workMinAmount   Int      @default(50)
+  workMaxAmount   Int      @default(200)
+  workCooldown    Int      @default(3600) // 1 hour in seconds
+  
+  startingBalance Int      @default(0)
+  
+  updatedAt       DateTime @updatedAt
+}
+
+model EconomyUser {
+  id        String   @id @default(cuid())
+  guildId   String
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  userId    String   // Discord User ID
+  balance   Int      @default(0)
+  bank      Int      @default(0)
+  
+  lastDaily DateTime?
+  lastWork  DateTime?
+  
+  totalEarned Int    @default(0)
+  totalSpent  Int    @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, userId])
+  @@index([guildId])
+  @@index([userId])
+}
+
+// ============================================
+// Custom Commands
+// ============================================
+
+model CustomCommand {
+  id        String   @id @default(cuid())
+  guildId   String
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  name      String
+  response  String
+  enabled   Boolean  @default(true)
+  
+  createdBy String
+  uses      Int      @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, name])
+  @@index([guildId])
+}
+
+// ============================================
+// Audit Logs
+// ============================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  action    String
+  target    String?  // What was affected
+  targetId  String?
+  details   Json?
+  ipAddress String?
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================
+// Bot Statistics
+// ============================================
+
+model BotStats {
+  id            String   @id @default(cuid())
+  
+  guildCount    Int      @default(0)
+  userCount     Int      @default(0)
+  channelCount  Int      @default(0)
+  commandsUsed  Int      @default(0)
+  
+  memoryUsage   Float?
+  cpuUsage      Float?
+  uptime        Int?     // In seconds
+  
+  shardId       Int?
+  
+  recordedAt    DateTime @default(now())
+
+  @@index([recordedAt])
+}
+
+model CommandStats {
+  id          String   @id @default(cuid())
+  
+  commandName String
+  guildId     String?
+  userId      String
+  
+  executionTime Int?   // In milliseconds
+  success     Boolean  @default(true)
+  errorMessage String?
+  
+  createdAt   DateTime @default(now())
+
+  @@index([commandName])
+  @@index([guildId])
+  @@index([createdAt])
+}

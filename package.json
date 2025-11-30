@@ -1,0 +1,40 @@
+{
+  "name": "sufbot-v5",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Advanced Discord Bot Infrastructure with Monorepo Architecture",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "bot:dev": "npm run dev --workspace=@sufbot/bot",
+    "bot:start": "npm run start --workspace=@sufbot/bot",
+    "api:dev": "npm run dev --workspace=@sufbot/api",
+    "api:start": "npm run start --workspace=@sufbot/api",
+    "panel:dev": "npm run dev --workspace=@sufbot/panel",
+    "panel:build": "npm run build --workspace=@sufbot/panel",
+    "db:generate": "npm run generate --workspace=@sufbot/database",
+    "db:push": "npm run push --workspace=@sufbot/database",
+    "db:migrate": "npm run migrate --workspace=@sufbot/database",
+    "db:studio": "npm run studio --workspace=@sufbot/database",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "npm@10.0.0",
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}

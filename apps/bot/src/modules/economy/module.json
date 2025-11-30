@@ -1,0 +1,6 @@
+{
+  "name": "economy",
+  "description": "Economy system with daily rewards, work commands, and balance management",
+  "enabled": true,
+  "version": "1.0.0"
+}

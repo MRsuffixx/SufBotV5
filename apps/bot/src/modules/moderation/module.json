@@ -1,0 +1,6 @@
+{
+  "name": "moderation",
+  "description": "Server moderation commands including ban, kick, mute, and warnings",
+  "enabled": true,
+  "version": "1.0.0"
+}
