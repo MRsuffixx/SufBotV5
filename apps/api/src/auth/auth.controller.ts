@@ -35,6 +35,10 @@ export class AuthController {
   async discordCallback(@Req() req: Request, @Res() res: Response) {
     const user = req.user as any;
     
+    console.log('[Auth] Discord callback received for user:', user?.username);
+    console.log('[Auth] User ID:', user?.id);
+    console.log('[Auth] PANEL_URL:', process.env.PANEL_URL);
+    
     // Create session first (needed for storing Discord token)
     await this.authService.createSession(
       user.id,
@@ -64,16 +68,20 @@ export class AuthController {
     );
 
     // Set refresh token as HTTP-only cookie
+    const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-site cookies
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      domain: isProduction ? '.olnk.tr' : undefined, // Share cookie across subdomains
     });
 
     // Redirect to panel with access token
     const panelUrl = process.env.PANEL_URL || 'http://localhost:3000';
-    res.redirect(`${panelUrl}/auth/callback?token=${tokens.accessToken}`);
+    const redirectUrl = `${panelUrl}/auth/callback?token=${tokens.accessToken}`;
+    console.log('[Auth] Redirecting to:', redirectUrl);
+    res.redirect(redirectUrl);
   }
 
   @Post('refresh')
@@ -108,10 +116,13 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user' })
   async me(@CurrentUser('id') userId: string) {
+    console.log('[Auth] /me endpoint called for userId:', userId);
     const user = await this.authService.validateUser(userId);
     if (!user) {
+      console.log('[Auth] /me - User not found');
       return null;
     }
+    console.log('[Auth] /me - Returning user:', user.username);
     return {
       id: user.id,
       discordId: user.discordId,

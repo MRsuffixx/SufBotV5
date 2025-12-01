@@ -1,6 +1,6 @@
 const { Client } = require("pg");
 
-const connectionString = "postgresql://mrsuffix:ZXCjqKbU0bfPOF0ZPDrDKRJrTZe9ondc@77.90.14.56:5432/sufbotv5?schema=public";
+const connectionString = "postgresql://sufbotv5:XY5KLYo4ZXgmGXgi@77.90.14.56:5432/sufbotv5?schema=public";
 
 async function testConnection() {
     const client = new Client({

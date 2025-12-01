@@ -50,3 +50,7 @@ docker-data/
 # Misc
 *.tsbuildinfo
 .eslintcache
+
+# Test Files
+dbtest.js
+SufBotV5.zip

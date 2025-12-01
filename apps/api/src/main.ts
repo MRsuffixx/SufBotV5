@@ -14,13 +14,37 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
-  // Security
-  app.use(helmet());
+  // Trust proxy (important for Cloudflare tunnels)
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
+  // Security - configure helmet for production
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  }));
   app.use(cookieParser());
 
-  // CORS
+  // CORS - Allow panel URL and handle multiple origins
+  const panelUrl = configService.get('PANEL_URL', 'http://localhost:3000');
+  const allowedOrigins = [
+    panelUrl,
+    'http://localhost:3000',
+    'https://sufbot.olnk.tr',
+  ];
+  
   app.enableCors({
-    origin: configService.get('PANEL_URL', 'http://localhost:3000'),
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log(`CORS blocked origin: ${origin}`);
+        callback(null, true); // Allow all for now to debug
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],

@@ -38,16 +38,22 @@ export const useAuthStore = create<AuthState>()(
       login: async (token: string) => {
         set({ accessToken: token, isLoading: true });
         try {
+          console.log('[Auth] Logging in with token:', token.substring(0, 20) + '...');
           const response = await fetch(`${API_URL}/api/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
           });
+          console.log('[Auth] Login response status:', response.status);
           if (response.ok) {
             const user = await response.json();
+            console.log('[Auth] User data:', user);
             set({ user, isAuthenticated: true, isLoading: false });
           } else {
+            console.log('[Auth] Login failed, response not ok');
             set({ accessToken: null, isAuthenticated: false, isLoading: false });
           }
-        } catch {
+        } catch (error) {
+          console.error('[Auth] Login error:', error);
           set({ accessToken: null, isAuthenticated: false, isLoading: false });
         }
       },
@@ -68,6 +74,7 @@ export const useAuthStore = create<AuthState>()(
 
       checkAuth: async () => {
         const { accessToken } = get();
+        console.log('[Auth] Checking auth, token exists:', !!accessToken);
         if (!accessToken) {
           set({ isLoading: false });
           return;
@@ -76,14 +83,19 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await fetch(`${API_URL}/api/auth/me`, {
             headers: { Authorization: `Bearer ${accessToken}` },
+            credentials: 'include',
           });
+          console.log('[Auth] Check auth response:', response.status);
           if (response.ok) {
             const user = await response.json();
+            console.log('[Auth] User authenticated:', user.username);
             set({ user, isAuthenticated: true, isLoading: false });
           } else {
+            console.log('[Auth] Check auth failed, clearing state');
             set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
           }
-        } catch {
+        } catch (error) {
+          console.error('[Auth] Check auth error:', error);
           set({ isLoading: false });
         }
       },

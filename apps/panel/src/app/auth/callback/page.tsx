@@ -8,14 +8,25 @@ function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const login = useAuthStore((state) => state.login);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
     const token = searchParams.get('token');
+    console.log('[Callback] Token received:', token ? 'yes' : 'no');
+    
     if (token) {
       login(token).then(() => {
-        router.push('/dashboard');
+        console.log('[Callback] Login complete, redirecting to dashboard');
+        // Small delay to ensure state is persisted
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 100);
+      }).catch((error) => {
+        console.error('[Callback] Login error:', error);
+        router.push('/');
       });
     } else {
+      console.log('[Callback] No token, redirecting to home');
       router.push('/');
     }
   }, [searchParams, login, router]);
