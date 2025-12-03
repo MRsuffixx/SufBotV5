@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
+import { DashboardHeader } from '@/components/DashboardHeader';
 import { 
-  Bot, 
   Server, 
   Users, 
   Activity, 
@@ -81,56 +81,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2">
-            <Bot className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">SufBot Dashboard</span>
-          </div>
-          <nav className="flex items-center gap-6">
-            <button 
-              onClick={() => router.push('/dashboard')}
-              className="text-foreground font-medium"
-            >
-              Dashboard
-            </button>
-            <button 
-              onClick={() => router.push('/dashboard/servers')}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Servers
-            </button>
-            {(user?.role === 'OWNER' || user?.role === 'ADMIN') && (
-              <button 
-                onClick={() => router.push('/dashboard/admin')}
-                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-              >
-                <Crown className="h-4 w-4 text-amber-500" />
-                Admin
-              </button>
-            )}
-          </nav>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              {user?.username}
-            </span>
-            {user?.avatar ? (
-              <img 
-                src={`https://cdn.discordapp.com/avatars/${user.discordId}/${user.avatar}.png`}
-                alt={user.username}
-                className="h-8 w-8 rounded-full"
-              />
-            ) : (
-              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-                <span className="text-sm font-medium text-primary">
-                  {user?.username?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      <DashboardHeader activeTab="dashboard" />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">

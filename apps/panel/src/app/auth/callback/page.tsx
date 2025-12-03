@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
 
@@ -8,34 +8,83 @@ function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const login = useAuthStore((state) => state.login);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    console.log('[Callback] Token received:', token ? 'yes' : 'no');
-    
-    if (token) {
-      login(token).then(() => {
-        console.log('[Callback] Login complete, redirecting to dashboard');
-        // Small delay to ensure state is persisted
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 100);
-      }).catch((error) => {
+    const handleAuth = async () => {
+      const token = searchParams.get('token');
+      console.log('[Callback] Token received:', token ? 'yes' : 'no');
+      
+      if (!token) {
+        console.log('[Callback] No token, redirecting to home');
+        setStatus('error');
+        setErrorMessage('No authentication token received');
+        setTimeout(() => router.push('/'), 2000);
+        return;
+      }
+
+      try {
+        console.log('[Callback] Attempting login...');
+        const success = await login(token);
+        
+        if (success) {
+          console.log('[Callback] Login successful!');
+          setStatus('success');
+          // Use replace to prevent back button issues
+          setTimeout(() => {
+            router.replace('/dashboard');
+          }, 500);
+        } else {
+          console.log('[Callback] Login failed');
+          setStatus('error');
+          setErrorMessage('Authentication failed. Please try again.');
+          setTimeout(() => router.push('/'), 3000);
+        }
+      } catch (error) {
         console.error('[Callback] Login error:', error);
-        router.push('/');
-      });
-    } else {
-      console.log('[Callback] No token, redirecting to home');
-      router.push('/');
-    }
+        setStatus('error');
+        setErrorMessage('An error occurred during authentication');
+        setTimeout(() => router.push('/'), 3000);
+      }
+    };
+
+    handleAuth();
   }, [searchParams, login, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <div className="mb-4 h-8 w-8 mx-auto animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="text-muted-foreground">Authenticating...</p>
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="text-center p-8 rounded-xl border bg-card max-w-md">
+        {status === 'loading' && (
+          <>
+            <div className="mb-4 h-12 w-12 mx-auto animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <h2 className="text-xl font-semibold mb-2">Authenticating...</h2>
+            <p className="text-muted-foreground">Please wait while we log you in</p>
+          </>
+        )}
+        {status === 'success' && (
+          <>
+            <div className="mb-4 h-12 w-12 mx-auto rounded-full bg-green-500/20 flex items-center justify-center">
+              <svg className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Login Successful!</h2>
+            <p className="text-muted-foreground">Redirecting to dashboard...</p>
+          </>
+        )}
+        {status === 'error' && (
+          <>
+            <div className="mb-4 h-12 w-12 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
+              <svg className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Authentication Failed</h2>
+            <p className="text-muted-foreground">{errorMessage}</p>
+            <p className="text-sm text-muted-foreground mt-2">Redirecting to home...</p>
+          </>
+        )}
       </div>
     </div>
   );
@@ -44,7 +93,7 @@ function AuthCallbackContent() {
 export default function AuthCallbackPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     }>

@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
+import { DashboardHeader } from '@/components/DashboardHeader';
 import { 
   Server, 
   Settings, 
   Plus,
   Crown,
-  Shield,
-  Bot
+  Shield
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -85,29 +85,7 @@ export default function ServersPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2">
-            <Bot className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">SufBot Dashboard</span>
-          </div>
-          <nav className="flex items-center gap-4">
-            <button 
-              onClick={() => router.push('/dashboard')}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Dashboard
-            </button>
-            <button 
-              onClick={() => router.push('/dashboard/servers')}
-              className="text-foreground font-medium"
-            >
-              Servers
-            </button>
-          </nav>
-        </div>
-      </header>
+      <DashboardHeader activeTab="servers" />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
