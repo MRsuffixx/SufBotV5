@@ -30,6 +30,25 @@ export class GuildsController {
     return this.guildsService.getGuilds(userId, role);
   }
 
+  @Get('admin/all')
+  @ApiOperation({ summary: 'Get all guilds bot is in (Admin only)' })
+  async getAllGuilds(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.guildsService.getAllGuilds(userId, role);
+  }
+
+  @Delete('admin/:id/leave')
+  @ApiOperation({ summary: 'Make bot leave a guild (Admin only)' })
+  async leaveGuild(
+    @Param('id') guildId: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.guildsService.leaveGuild(guildId, userId, role);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get guild by ID' })
   async getGuild(

@@ -4,11 +4,14 @@
 
 import {
   SlashCommandBuilder,
+  SlashCommandOptionsOnlyBuilder,
+  SlashCommandSubcommandsOnlyBuilder,
   ChatInputCommandInteraction,
   AutocompleteInteraction,
   PermissionResolvable,
   Client,
   Message,
+  Interaction,
 } from 'discord.js';
 
 // Command Types
@@ -26,9 +29,15 @@ export interface CommandMeta {
   enabled: boolean;
 }
 
+export type SlashCommandData = 
+  | SlashCommandBuilder 
+  | SlashCommandOptionsOnlyBuilder 
+  | SlashCommandSubcommandsOnlyBuilder
+  | Omit<SlashCommandBuilder, 'addSubcommand' | 'addSubcommandGroup'>;
+
 export interface Command {
   meta: CommandMeta;
-  data: SlashCommandBuilder | Omit<SlashCommandBuilder, 'addSubcommand' | 'addSubcommandGroup'>;
+  data: SlashCommandData;
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
   autocomplete?: (interaction: AutocompleteInteraction) => Promise<void>;
 }
@@ -45,10 +54,10 @@ export interface Module {
 }
 
 // Event Types
-export interface Event {
+export interface Event<T extends unknown[] = unknown[]> {
   name: string;
   once?: boolean;
-  execute: (...args: unknown[]) => Promise<void> | void;
+  execute: (...args: T) => Promise<void> | void;
 }
 
 // Guild Settings Cache

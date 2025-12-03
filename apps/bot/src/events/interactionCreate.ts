@@ -2,14 +2,14 @@
 // SUFBOT V5 - Interaction Create Event
 // ============================================
 
-import { Interaction, ChatInputCommandInteraction, PermissionsBitField } from 'discord.js';
+import { Interaction, ChatInputCommandInteraction, PermissionsBitField, GuildMember } from 'discord.js';
 import { logger, commandLogger } from '../utils/logger';
 import { prisma } from '@sufbot/database';
 import type { Event, Command } from '../types';
 
-const event: Event = {
+const event: Event<[Interaction]> = {
   name: 'interactionCreate',
-  async execute(interaction: Interaction) {
+  async execute(interaction) {
     if (!interaction.isChatInputCommand()) return;
 
     const client = interaction.client;
@@ -53,8 +53,8 @@ const event: Event = {
 
     // Check user permissions
     if (command.meta.permissions.length > 0 && interaction.guild) {
-      const member = interaction.member;
-      if (member && 'permissions' in member) {
+      const member = interaction.member as GuildMember | null;
+      if (member && member.permissions instanceof PermissionsBitField) {
         const missingPerms = command.meta.permissions.filter(
           perm => !member.permissions.has(perm)
         );

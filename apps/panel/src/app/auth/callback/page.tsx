@@ -26,6 +26,7 @@ function AuthCallbackContent() {
 
       try {
         console.log('[Callback] Attempting login...');
+        console.log('[Callback] Token length:', token.length);
         const success = await login(token);
         
         if (success) {
@@ -38,14 +39,14 @@ function AuthCallbackContent() {
         } else {
           console.log('[Callback] Login failed');
           setStatus('error');
-          setErrorMessage('Authentication failed. Please try again.');
-          setTimeout(() => router.push('/'), 3000);
+          setErrorMessage('Authentication failed. Check browser console for details.');
+          setTimeout(() => router.push('/'), 5000);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('[Callback] Login error:', error);
         setStatus('error');
-        setErrorMessage('An error occurred during authentication');
-        setTimeout(() => router.push('/'), 3000);
+        setErrorMessage(`Error: ${error?.message || 'Unknown error'}`);
+        setTimeout(() => router.push('/'), 5000);
       }
     };
 

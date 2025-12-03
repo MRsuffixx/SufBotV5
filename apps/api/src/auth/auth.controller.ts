@@ -22,6 +22,20 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  @Get('health')
+  @ApiOperation({ summary: 'Health check endpoint' })
+  health() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      env: {
+        nodeEnv: process.env.NODE_ENV,
+        apiUrl: process.env.API_URL,
+        panelUrl: process.env.PANEL_URL,
+      },
+    };
+  }
+
   @Get('discord')
   @UseGuards(DiscordAuthGuard)
   @ApiOperation({ summary: 'Initiate Discord OAuth2 login' })

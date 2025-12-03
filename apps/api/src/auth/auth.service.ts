@@ -42,7 +42,7 @@ export class AuthService {
     });
 
     // Determine user role
-    let role = UserRole.USER;
+    let role: UserRole = UserRole.USER;
     if (isBotOwner) {
       role = UserRole.OWNER;
     } else if (user?.role === UserRole.ADMIN || user?.role === UserRole.MODERATOR) {

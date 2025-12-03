@@ -27,7 +27,8 @@ import {
   Check,
   Loader2,
   Timer,
-  Link as LinkIcon
+  Link as LinkIcon,
+  LogOut
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -136,7 +137,7 @@ export default function AdminPage() {
 
   const fetchGuilds = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/guilds`, {
+      const response = await fetch(`${API_URL}/api/guilds/admin/all`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (response.ok) {
@@ -147,6 +148,31 @@ export default function AdminPage() {
       console.error('Failed to fetch guilds:', error);
     } finally {
       setGuildsLoading(false);
+    }
+  };
+
+  const leaveGuild = async (guildId: string, guildName: string) => {
+    if (!confirm(`Are you sure you want to make the bot leave "${guildName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/guilds/admin/${guildId}/leave`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (response.ok) {
+        // Remove guild from list
+        setGuilds(prev => prev.filter(g => g.id !== guildId));
+        alert(`Bot has left "${guildName}" successfully.`);
+      } else {
+        const error = await response.text();
+        alert(`Failed to leave guild: ${error}`);
+      }
+    } catch (error) {
+      console.error('Failed to leave guild:', error);
+      alert('Failed to leave guild. Check console for details.');
     }
   };
 
@@ -719,12 +745,22 @@ export default function AdminPage() {
                               )}
                             </td>
                             <td className="px-4 py-3">
-                              <button
-                                onClick={() => router.push(`/dashboard/servers/${guild.id}`)}
-                                className="px-3 py-1 rounded-lg text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                              >
-                                Manage
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => router.push(`/dashboard/servers/${guild.id}`)}
+                                  className="px-3 py-1 rounded-lg text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                >
+                                  Manage
+                                </button>
+                                <button
+                                  onClick={() => leaveGuild(guild.id, guild.name)}
+                                  className="flex items-center gap-1 px-3 py-1 rounded-lg text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                                  title="Make bot leave this server"
+                                >
+                                  <LogOut className="h-3 w-3" />
+                                  Leave
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}

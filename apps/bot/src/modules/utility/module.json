@@ -1,0 +1,6 @@
+{
+  "name": "utility",
+  "description": "Utility commands for server information, user info, and general tools",
+  "enabled": true,
+  "version": "1.0.0"
+}

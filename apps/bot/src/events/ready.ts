@@ -7,10 +7,10 @@ import { logger } from '../utils/logger';
 import { config } from '../config';
 import type { Event } from '../types';
 
-const event: Event = {
+const event: Event<[Client<true>]> = {
   name: 'ready',
   once: true,
-  async execute(client: Client<true>) {
+  async execute(client) {
     logger.info(`Logged in as ${client.user.tag}`);
     logger.info(`Serving ${client.guilds.cache.size} guilds`);
     logger.info(`Shard: ${client.shard?.ids[0] ?? 'N/A'}`);

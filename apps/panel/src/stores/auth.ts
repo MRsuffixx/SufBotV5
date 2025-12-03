@@ -41,10 +41,14 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (token: string) => {
         console.log('[Auth] Starting login...');
+        console.log('[Auth] API_URL:', API_URL);
         set({ accessToken: token, isLoading: true });
         
         try {
-          const response = await fetch(`${API_URL}/api/auth/me`, {
+          const url = `${API_URL}/api/auth/me`;
+          console.log('[Auth] Fetching:', url);
+          
+          const response = await fetch(url, {
             method: 'GET',
             headers: { 
               'Authorization': `Bearer ${token}`,
@@ -53,6 +57,7 @@ export const useAuthStore = create<AuthState>()(
           });
           
           console.log('[Auth] Login response status:', response.status);
+          console.log('[Auth] Response headers:', Object.fromEntries(response.headers.entries()));
           
           if (response.ok) {
             const user = await response.json();
@@ -65,8 +70,14 @@ export const useAuthStore = create<AuthState>()(
             });
             return true;
           } else {
-            const errorText = await response.text();
-            console.log('[Auth] Login failed:', response.status, errorText);
+            let errorText = '';
+            try {
+              errorText = await response.text();
+            } catch (e) {
+              errorText = 'Could not read error response';
+            }
+            console.error('[Auth] Login failed:', response.status, errorText);
+            console.error('[Auth] Response URL:', response.url);
             set({ 
               user: null,
               accessToken: null, 
@@ -75,8 +86,9 @@ export const useAuthStore = create<AuthState>()(
             });
             return false;
           }
-        } catch (error) {
-          console.error('[Auth] Login error:', error);
+        } catch (error: any) {
+          console.error('[Auth] Login network error:', error?.message || error);
+          console.error('[Auth] Error details:', error);
           set({ 
             user: null,
             accessToken: null, 

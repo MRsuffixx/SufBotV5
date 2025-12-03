@@ -34,8 +34,8 @@ manager.on('shardCreate', (shard) => {
     logger.info(`Shard ${shard.id} reconnecting`);
   });
 
-  shard.on('death', (process) => {
-    logger.error(`Shard ${shard.id} died with exit code ${process.exitCode}`);
+  shard.on('death', (childProcess) => {
+    logger.error(`Shard ${shard.id} died with exit code ${(childProcess as any).exitCode}`);
   });
 
   shard.on('error', (error) => {

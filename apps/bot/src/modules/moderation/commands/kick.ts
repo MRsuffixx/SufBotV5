@@ -7,6 +7,7 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits,
   EmbedBuilder,
+  GuildMember,
 } from 'discord.js';
 import { prisma } from '@sufbot/database';
 import { COLORS } from '@sufbot/shared';
@@ -71,7 +72,8 @@ const command: Command = {
       return;
     }
 
-    if (executorMember && 'roles' in executorMember && member.roles.highest.position >= executorMember.roles.highest.position) {
+    const executor = executorMember as GuildMember | null;
+    if (executor && executor.roles && member.roles.highest.position >= executor.roles.highest.position) {
       await interaction.reply({
         content: '❌ You cannot kick this user as their role is higher than or equal to yours.',
         ephemeral: true,

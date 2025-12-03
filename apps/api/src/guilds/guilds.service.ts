@@ -31,7 +31,7 @@ export class GuildsService {
 
     // Get guilds from database that bot is in
     const botGuilds = await this.prisma.guild.findMany({
-      select: { id: true },
+      select: { id: true, name: true, icon: true, ownerId: true },
     });
     const botGuildIds = new Set(botGuilds.map(g => g.id));
 
@@ -42,13 +42,13 @@ export class GuildsService {
       if (discordToken) {
         const discordGuilds = await this.fetchUserGuildsFromDiscord(discordToken);
         
-        // Filter to only guilds where user has admin permission
+        // Filter to only guilds where user has admin permission AND is actually in the guild
         const adminGuilds = discordGuilds.filter(guild => {
           const permissions = BigInt(guild.permissions);
           return guild.owner || (permissions & BigInt(ADMIN_PERMISSION)) === BigInt(ADMIN_PERMISSION);
         });
 
-        // Add hasBot flag
+        // Add hasBot flag - only return guilds user is actually in
         return adminGuilds.map(guild => ({
           ...guild,
           hasBot: botGuildIds.has(guild.id),
@@ -58,19 +58,103 @@ export class GuildsService {
       console.error('Failed to fetch Discord guilds:', error);
     }
 
-    // Fallback: return guilds from database
-    const guilds = await this.prisma.guild.findMany({
-      include: { settings: true },
-    });
+    // Fallback: return ONLY guilds where user is the owner (from database)
+    // This prevents showing other users' servers
+    const userOwnedGuilds = botGuilds.filter(g => g.ownerId === user.discordId);
     
-    return guilds.map(guild => ({
+    return userOwnedGuilds.map(guild => ({
       id: guild.id,
       name: guild.name,
       icon: guild.icon,
-      owner: guild.ownerId === user.discordId,
+      owner: true,
       permissions: '8',
       hasBot: true,
     }));
+  }
+
+  // Admin only: Get ALL guilds the bot is in
+  async getAllGuilds(userId: string, userRole: string) {
+    // Only OWNER and ADMIN can see all guilds
+    if (userRole !== 'OWNER' && userRole !== 'ADMIN') {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const guilds = await this.prisma.guild.findMany({
+      include: { settings: true },
+      orderBy: { name: 'asc' },
+    });
+
+    // Fetch member counts from Discord API
+    const botToken = process.env.DISCORD_TOKEN;
+    const guildsWithDetails = await Promise.all(
+      guilds.map(async (guild) => {
+        let memberCount = 0;
+        try {
+          if (botToken) {
+            const response = await fetch(`${DISCORD_API}/guilds/${guild.id}?with_counts=true`, {
+              headers: { Authorization: `Bot ${botToken}` },
+            });
+            if (response.ok) {
+              const data = await response.json();
+              memberCount = data.approximate_member_count || 0;
+            }
+          }
+        } catch (e) {
+          // Ignore errors
+        }
+        return {
+          id: guild.id,
+          name: guild.name,
+          icon: guild.icon,
+          ownerId: guild.ownerId,
+          memberCount,
+          hasBot: true,
+        };
+      })
+    );
+
+    return guildsWithDetails;
+  }
+
+  // Admin only: Make bot leave a guild
+  async leaveGuild(guildId: string, userId: string, userRole: string) {
+    // Only OWNER and ADMIN can make bot leave guilds
+    if (userRole !== 'OWNER' && userRole !== 'ADMIN') {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const botToken = process.env.DISCORD_TOKEN;
+    if (!botToken) {
+      throw new Error('DISCORD_TOKEN not found');
+    }
+
+    try {
+      // Make bot leave the guild via Discord API
+      const response = await fetch(`${DISCORD_API}/users/@me/guilds/${guildId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bot ${botToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Failed to leave guild:', error);
+        throw new Error('Failed to leave guild');
+      }
+
+      // Remove guild from database
+      await this.prisma.guild.delete({
+        where: { id: guildId },
+      }).catch(() => {
+        // Guild might not exist in DB, ignore
+      });
+
+      return { success: true, message: 'Bot left the guild successfully' };
+    } catch (error) {
+      console.error('Error leaving guild:', error);
+      throw error;
+    }
   }
 
   private async fetchUserGuildsFromDiscord(accessToken: string): Promise<DiscordGuild[]> {

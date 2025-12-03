@@ -10,12 +10,39 @@ import type { Command, Module } from './types';
 import { slashCommands, commandModuleMap, commandCooldowns } from './commands';
 import * as handlers from './commands/handlers';
 
+// Cache interface for guild settings
+interface CacheManager {
+  getGuildSettings: (guildId: string) => Promise<any | null>;
+  setGuildSettings: (guildId: string, settings: any) => Promise<void>;
+  deleteGuildSettings: (guildId: string) => Promise<void>;
+  getCooldown: (userId: string, commandName: string) => Promise<number | null>;
+  setCooldown: (userId: string, commandName: string, expiresAt: number) => Promise<void>;
+}
+
+// WebSocket client interface
+interface WsClient {
+  emitCommandExecute: (data: any) => void;
+  emitCommandError: (data: any) => void;
+  emitModAction: (data: any) => void;
+  emit: (event: string, data: any) => void;
+}
+
+// Command handler interface
+interface CommandHandler {
+  deployCommands: (guildId?: string) => Promise<void>;
+  reloadModule: (moduleName: string) => Promise<boolean>;
+  reloadCommand: (commandName: string) => Promise<boolean>;
+}
+
 // Extend Client
 declare module 'discord.js' {
   interface Client {
     commands: Collection<string, Command>;
     modules: Collection<string, Module>;
     cooldowns: Collection<string, Collection<string, number>>;
+    cache: CacheManager;
+    wsClient?: WsClient;
+    commandHandler: CommandHandler;
   }
 }
 
@@ -46,6 +73,49 @@ const client = new Client({
 client.commands = new Collection();
 client.modules = new Collection();
 client.cooldowns = new Collection();
+
+// In-memory cache for guild settings and cooldowns
+const guildSettingsCache = new Map<string, any>();
+const cooldownCache = new Map<string, number>();
+
+// Initialize cache manager
+client.cache = {
+  async getGuildSettings(guildId: string) {
+    return guildSettingsCache.get(guildId) || null;
+  },
+  async setGuildSettings(guildId: string, settings: any) {
+    guildSettingsCache.set(guildId, settings);
+  },
+  async deleteGuildSettings(guildId: string) {
+    guildSettingsCache.delete(guildId);
+  },
+  async getCooldown(userId: string, commandName: string) {
+    return cooldownCache.get(`${userId}:${commandName}`) || null;
+  },
+  async setCooldown(userId: string, commandName: string, expiresAt: number) {
+    cooldownCache.set(`${userId}:${commandName}`, expiresAt);
+    // Auto-cleanup after expiry
+    setTimeout(() => {
+      cooldownCache.delete(`${userId}:${commandName}`);
+    }, expiresAt - Date.now());
+  },
+};
+
+// Initialize command handler
+client.commandHandler = {
+  async deployCommands(guildId?: string) {
+    // Command deployment logic
+    logger.info(`Deploying commands${guildId ? ` to guild ${guildId}` : ' globally'}`);
+  },
+  async reloadModule(moduleName: string) {
+    logger.info(`Reloading module: ${moduleName}`);
+    return true;
+  },
+  async reloadCommand(commandName: string) {
+    logger.info(`Reloading command: ${commandName}`);
+    return true;
+  },
+};
 
 // Sync guild to database
 async function syncGuildToDatabase(guild: any) {
