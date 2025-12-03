@@ -8,11 +8,15 @@ import {
   Server, 
   Users, 
   Activity, 
-  Cpu, 
-  HardDrive,
   Clock,
   TrendingUp,
-  Crown
+  Crown,
+  Settings,
+  Shield,
+  Zap,
+  MessageSquare,
+  ExternalLink,
+  Bot
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -126,93 +130,119 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* System Stats */}
+        {/* Bot Properties & Features */}
         <div className="mb-8 grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border bg-card p-6">
             <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-              <Cpu className="h-5 w-5 text-blue-500" />
-              CPU Usage
+              <Bot className="h-5 w-5 text-primary" />
+              Bot Properties
             </h3>
-            <div className="mb-3 h-4 overflow-hidden rounded-full bg-secondary">
-              <div 
-                className={`h-full transition-all duration-500 ${
-                  (stats?.cpuUsage ?? 0) > 80 ? 'bg-red-500' :
-                  (stats?.cpuUsage ?? 0) > 50 ? 'bg-amber-500' : 'bg-green-500'
-                }`}
-                style={{ width: `${Math.min(stats?.cpuUsage ?? 0, 100)}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-2xl font-bold">
-                {(stats?.cpuUsage ?? 0).toFixed(1)}%
-              </p>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                (stats?.cpuUsage ?? 0) > 80 ? 'bg-red-500/20 text-red-500' :
-                (stats?.cpuUsage ?? 0) > 50 ? 'bg-amber-500/20 text-amber-500' : 'bg-green-500/20 text-green-500'
-              }`}>
-                {(stats?.cpuUsage ?? 0) > 80 ? 'High' : (stats?.cpuUsage ?? 0) > 50 ? 'Medium' : 'Normal'}
-              </span>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-border/50">
+                <span className="text-muted-foreground">Status</span>
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  Online
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-border/50">
+                <span className="text-muted-foreground">Version</span>
+                <span className="font-medium">v5.0.0</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-border/50">
+                <span className="text-muted-foreground">Commands</span>
+                <span className="font-medium">25+</span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-muted-foreground">Uptime</span>
+                <span className="font-medium">{formatUptime(stats?.uptime ?? 0)}</span>
+              </div>
             </div>
           </div>
 
           <div className="rounded-xl border bg-card p-6">
             <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-              <HardDrive className="h-5 w-5 text-purple-500" />
-              Memory Usage
+              <Zap className="h-5 w-5 text-amber-500" />
+              Features
             </h3>
-            <div className="mb-3 h-4 overflow-hidden rounded-full bg-secondary">
-              <div 
-                className={`h-full transition-all duration-500 ${
-                  (stats?.memoryUsage ?? 0) > 800 ? 'bg-red-500' :
-                  (stats?.memoryUsage ?? 0) > 400 ? 'bg-amber-500' : 'bg-green-500'
-                }`}
-                style={{ width: `${Math.min((stats?.memoryUsage ?? 0) / 10, 100)}%` }}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50">
+                <Shield className="h-4 w-4 text-blue-500" />
+                <span className="text-sm">Moderation</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50">
+                <MessageSquare className="h-4 w-4 text-green-500" />
+                <span className="text-sm">Auto Responder</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50">
+                <Users className="h-4 w-4 text-purple-500" />
+                <span className="text-sm">Welcome System</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50">
+                <Activity className="h-4 w-4 text-red-500" />
+                <span className="text-sm">Logging</span>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <p className="text-2xl font-bold">
-                {(stats?.memoryUsage ?? 0) >= 1024 
-                  ? `${((stats?.memoryUsage ?? 0) / 1024).toFixed(2)} GB`
-                  : `${(stats?.memoryUsage ?? 0).toFixed(1)} MB`
-                }
-              </p>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                (stats?.memoryUsage ?? 0) > 800 ? 'bg-red-500/20 text-red-500' :
-                (stats?.memoryUsage ?? 0) > 400 ? 'bg-amber-500/20 text-amber-500' : 'bg-green-500/20 text-green-500'
-              }`}>
-                {(stats?.memoryUsage ?? 0) > 800 ? 'High' : (stats?.memoryUsage ?? 0) > 400 ? 'Medium' : 'Normal'}
-              </span>
-            </div>
+            <a 
+              href="https://discord.gg/sufbot" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="mt-4 flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Join Support Server
+            </a>
           </div>
         </div>
 
         {/* Quick Actions */}
         <div className="rounded-xl border bg-card p-6">
           <h3 className="mb-4 text-lg font-semibold">Quick Actions</h3>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <button 
               onClick={() => router.push('/dashboard/servers')}
               className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"
             >
               <Server className="h-5 w-5 text-primary" />
-              <span>Manage Servers</span>
+              <div className="text-left">
+                <span className="font-medium">Manage Servers</span>
+                <p className="text-xs text-muted-foreground">Configure your servers</p>
+              </div>
             </button>
-            {(user?.role === 'OWNER' || user?.role === 'ADMIN') && (
-              <button 
-                onClick={() => router.push('/dashboard/admin')}
-                className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent border-amber-500/30"
-              >
-                <Crown className="h-5 w-5 text-amber-500" />
-                <span>Bot Owner Panel</span>
-              </button>
-            )}
             <button 
               onClick={fetchStats}
               className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"
             >
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <span>Refresh Stats</span>
+              <TrendingUp className="h-5 w-5 text-green-500" />
+              <div className="text-left">
+                <span className="font-medium">Refresh Stats</span>
+                <p className="text-xs text-muted-foreground">Update dashboard data</p>
+              </div>
             </button>
+            <a 
+              href="https://discord.com/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=8&scope=bot%20applications.commands"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"
+            >
+              <Bot className="h-5 w-5 text-blue-500" />
+              <div className="text-left">
+                <span className="font-medium">Invite Bot</span>
+                <p className="text-xs text-muted-foreground">Add to another server</p>
+              </div>
+            </a>
+            {(user?.role === 'OWNER' || user?.role === 'ADMIN') && (
+              <button 
+                onClick={() => router.push('/dashboard/admin')}
+                className="flex items-center gap-3 rounded-lg border border-amber-500/30 p-4 transition-colors hover:bg-amber-500/10"
+              >
+                <Crown className="h-5 w-5 text-amber-500" />
+                <div className="text-left">
+                  <span className="font-medium">Owner Panel</span>
+                  <p className="text-xs text-muted-foreground">Bot administration</p>
+                </div>
+              </button>
+            )}
           </div>
         </div>
       </main>

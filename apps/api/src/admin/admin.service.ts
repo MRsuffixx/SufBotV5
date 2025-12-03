@@ -1,9 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { WebSocketGateway } from '../websocket/websocket.gateway';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => WebSocketGateway))
+    private wsGateway: WebSocketGateway,
+  ) {}
 
   async getUsers(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
@@ -130,13 +135,19 @@ export class AdminService {
       rotateInterval: config.rotateInterval,
     };
 
+    let result;
     if (existingConfig) {
-      return this.prisma.botConfig.update({
+      result = await this.prisma.botConfig.update({
         where: { id: existingConfig.id },
         data,
       });
     } else {
-      return this.prisma.botConfig.create({ data });
+      result = await this.prisma.botConfig.create({ data });
     }
+
+    // Notify bot to reload status
+    this.wsGateway.reloadBotStatus();
+
+    return result;
   }
 }

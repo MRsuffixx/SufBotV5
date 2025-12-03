@@ -147,4 +147,8 @@ export class WebSocketGateway implements OnGatewayInit, OnGatewayConnection, OnG
   requestStats() {
     return this.sendToBot('bot:get-stats', {});
   }
+
+  reloadBotStatus() {
+    return this.sendToBot('bot:reload-status', {});
+  }
 }

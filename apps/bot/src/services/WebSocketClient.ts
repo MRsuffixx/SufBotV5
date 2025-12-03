@@ -121,6 +121,15 @@ export class WebSocketClient {
       await this.client.cache.deleteGuildSettings(data.guildId);
       logger.debug(`Guild settings cache invalidated for ${data.guildId}`);
     });
+
+    // Handle bot status reload request from API
+    this.socket.on('bot:reload-status', async () => {
+      logger.info('Received request to reload bot status');
+      // Import dynamically to avoid circular dependency
+      const { loadBotStatus } = await import('../bot');
+      await loadBotStatus();
+      this.emit('bot:status-reloaded', { success: true });
+    });
   }
 
   private async getStats() {
